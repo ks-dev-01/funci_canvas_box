@@ -1,6 +1,7 @@
 namespace FuncuiCanvasBoxes
 
 module Shell =
+    open System
     open Elmish
     open Avalonia.Controls
     open Avalonia.Controls.Shapes
@@ -13,21 +14,20 @@ module Shell =
     open Avalonia.Media
     open Avalonia
     open Avalonia.VisualTree
-    open System
 
     let version = 0.1
 
-    let mutable MaxBoxId = 0L
-
-    type BoxComponent = {
-        Id : int64
-        Name : string
-        Point : Point
-    }
+    type BoxComponent = 
+        { Id : int64
+          Name : string
+          Point : Point }
 
     type State =
+        /// you can use optional types to represent the existance of a value
+        /// this gives you type safety and prevents you from doing akward ifs
         { BoxList : BoxComponent list
-          CurrentBox : BoxComponent 
+          CurrentBox : BoxComponent option
+          LastBoxId: int64 option
           CurrentName : string }
 
     type Msg =
@@ -36,165 +36,148 @@ module Shell =
         | CurrentNameChanged of string
     
     let init : State * Cmd<Msg> =
-        let newBox = { Id = -1L 
-                       Name = ("")
-                       Point = Point(10.,10.) }
-
+        /// here's where the optional values come at play
+        /// in the beginning there's nothing so no need to initialize with 
+        /// "unfinished" states like an empty box or -1
         { BoxList = []
-          CurrentBox = newBox
+          CurrentBox = None
+          LastBoxId = None
           CurrentName = "" }, Cmd.none
 
-    let newBox point =  MaxBoxId <- MaxBoxId + 1L
-                        {
-                          Id = MaxBoxId
-                          Name = sprintf "New Box...%i" MaxBoxId
-                          Point = point
-                        }
+    let newBox id point =  
+        { Id = id
+          Name = sprintf "New Box...%i" id
+          Point = point }
 
     let update (msg: Msg) (state: State): State * Cmd<_> =
         match msg with
-        | NewBox point -> let newBoxT = newBox point
-                          let boxes = state.BoxList @ [newBoxT]
-                          { state with BoxList = boxes }, Cmd.none
+        | NewBox point ->
+            let id =
+                /// pattern matching is your friend it will help you take the correct road
+                match state.LastBoxId with
+                /// if there's a previous value it means we can just increment the value
+                | Some id -> id + 1L
+                /// if there's no value it means this is the first id
+                | None -> 1L
+            let newBoxT = newBox id point
+            /// I choose to use the "::" union operator but you can keep using concat
+            /// if it works better for you
+            let boxes = newBoxT :: state.BoxList
+            /// update the boxes and the id
+            { state with BoxList = boxes; LastBoxId = Some id }, Cmd.none
         | BoxClicked id ->
-                            printfn "BoxClicked Id: %i" id
-                            if id <> state.CurrentBox.Id then
-                                printfn "New Box"
-                                let oldBox = state.CurrentBox
-                                let clicked = (state.BoxList |> List.filter (fun x -> x.Id = id)).Head
-                                let newList = (state.BoxList |> List.filter (fun x -> x.Id <> id)) @ (if oldBox.Id = -1L then [] else [oldBox])
-                                printfn "BoxClicked Object: %A" clicked
-                                printfn "BoxClicked clicked.Name: %s" clicked.Name
-                                { state with CurrentBox = clicked;BoxList = newList;CurrentName=clicked.Name }, Cmd.none
-                            else
-                              printfn "Same Box"
-                              state, Cmd.none
+            printfn "BoxClicked Id: %i" id
+            /// we can use a tuple to return both values from the same place
+            let (clicked, currentName) = 
+                /// check with pattern matching if we have a current box
+                match state.CurrentBox with 
+                /// if we have a box and the id matches then return the box, else don't return anything
+                | Some bx -> if bx.Id = id then (Some bx, bx.Name) else (None, "")
+                | None -> 
+                    /// if we don't have anything check if the id exists in the boxes
+                    /// then return that box with its name
+                    let bx = state.BoxList |> List.find(fun bx -> bx.Id =  id)
+                    (Some bx, bx.Name)
+            /// update the CurrentBpx (BoxComponent option) and the CurrentName
+            { state with CurrentBox = clicked; CurrentName = currentName }, Cmd.none
         | CurrentNameChanged text ->
-                          if state.CurrentBox.Id = -1L then
-                            state,Cmd.none
-                          else
-                              printfn "---------------------CurrentQueryNameChanged Start--------------------"
-                              printfn "Text: %s" text
-                              let newCurrent = { state.CurrentBox with Name = text }
-                              printfn "New CurrentBox : %A" newCurrent
-                              printfn "---------------------CurrentQueryNameChanged End--------------------"
-                              { state with CurrentBox = newCurrent },Cmd.none
+            match state.CurrentBox with
+            /// again check if we have a box selected
+            | Some bx ->
+                /// update the box with the new Name
+                let updated = { bx with Name = text }
+                /// update the box list with the updated box (so it shows on the canvas list with its name updated)
+                let boxes = 
+                    state.BoxList 
+                    |> List.map(fun cbx -> if cbx.Id = bx.Id then updated else cbx)
+                { state with CurrentBox = Some updated; BoxList = boxes }, Cmd.none
+            | None ->
+                state, Cmd.none
 
-    let view (state: State) (dispatch) =
+    /// don't hesitate to create mini functions that display a specific part
+    /// of your view, this will allow you to reduce visual nesting and localize things
+    let private rightPanel state dispatch =
+        StackPanel.create [
+            Grid.column 1
+            StackPanel.children [
+                TextBox.create [ 
+                    TextBox.text state.CurrentName
+                    TextBox.onTextChanged (
+                        fun text -> 
+                            printfn "Text %s" text
+                            dispatch (CurrentNameChanged text)
+                    ) 
+                ]
+            ]
+        ]
 
+    let private label nbox = 
+        TextBlock.create [
+            TextBlock.tag nbox.Id
+            TextBlock.text (sprintf "%s" nbox.Name)
+            TextBlock.width 80.0
+            TextBlock.height 25.0
+            TextBlock.left (nbox.Point.X + 5.)
+            TextBlock.top (nbox.Point.Y + 5.)
+        ]  
+
+    let private rectangle nbox =
+        Rectangle.create [
+            Rectangle.tag nbox.Id
+            Rectangle.fill "white"
+            Rectangle.stroke "black"
+            Rectangle.strokeThickness 1.
+            Rectangle.width 80.0
+            Rectangle.height 25.0
+            Rectangle.left nbox.Point.X
+            Rectangle.top nbox.Point.Y
+        ]
+
+    let private canvasGrid state dispatch =
+        Grid.create [
+            Grid.column 0
+            Grid.showGridLines true
+            Grid.children [
+                Canvas.create [
+                    Canvas.name "MainCanvas"
+                    Canvas.background "white"
+                    Canvas.onPointerPressed (
+                        fun event ->
+                            event.Handled <- true                                                                       
+                            let source = (event.Source :?> Control)
+                            let eventSourceName = source.Name
+                            printfn "Canvas Event %A, Point %A, Source %A, Name %A" event (event.GetPosition (source :> IVisual)) source eventSourceName
+                            /// since the canvas and its children are in the same area its very likely that the source of the event
+                            /// is either the canvas, the textblock or the rectangle, you can use Pattern matching once again
+                            /// to check against the type of the source and decide which message to dispatch
+                            match source with 
+                            | :? Canvas ->
+                                dispatch (NewBox (event.GetPosition (source :> IVisual)))
+                            | :? TextBlock | :? Rectangle ->
+                                dispatch (BoxClicked (source.Tag :?> int64))
+                            | unknown ->
+                                printfn "Unrecognized Element %A" unknown
+
+                    )
+                    Canvas.children [
+                        printfn "--------Begin Drawing Query Boxes---------"
+                        for nbox in state.BoxList do
+                            printfn "Rectangle Query Box: %A" nbox
+                            rectangle nbox
+                            label nbox
+                        printfn "--------End Drawing Query Boxes---------"   
+                    ]
+                ]
+            ]
+        ]
+
+    let view (state: State) (dispatch: Msg -> unit) =
         Grid.create [
             Grid.columnDefinitions "0.6*,0.4*"
             Grid.showGridLines true
             Grid.children [
-                Grid.create [
-                    Grid.column 0
-                    Grid.showGridLines true
-                    Grid.children [
-                        Canvas.create [
-                            Canvas.name "MainCanvas"
-                            Canvas.background "white"
-                            Canvas.onPointerPressed (fun event -> let eventSourceName = (event.Source :?> Control).Name
-                                                                  printfn "Canvas Event %A, Point %A, Source %A, Name %A" event (event.GetPosition (event.Source :?> IVisual)) event.Source eventSourceName
-                                                                  if eventSourceName = "MainCanvas" then
-                                                                    dispatch (NewBox (event.GetPosition (event.Source :?> IVisual)))
-                                                                    event.Handled <- true                                                                          
-                                                                  )
-                            Canvas.children [
-                                printfn "--------Begin Drawing Query Boxes---------"
-                                printfn "CurrentBox: %i" state.CurrentBox.Id
-                                printfn "CurrentBox: %s" state.CurrentName
-                                if state.CurrentBox.Id <> -1L then
-                                    yield Rectangle.create [
-                                            Rectangle.name (sprintf "R%i" state.CurrentBox.Id)
-                                            Rectangle.fill "white"
-                                            Rectangle.stroke "black"
-                                            Rectangle.strokeThickness 1.
-                                            Rectangle.width 80.0
-                                            Rectangle.height 25.0
-                                            Rectangle.left state.CurrentBox.Point.X
-                                            Rectangle.top state.CurrentBox.Point.Y
-                                            Rectangle.onPointerPressed (fun event -> let eventSourceName = (event.Source :?> Control).Name
-                                                                                     printfn "Rect Event %A, Point %A, Source %A, Name %A" event (event.GetPosition (event.Source :?> IVisual)) event.Source eventSourceName
-                                                                                     let xid =
-                                                                                        match eventSourceName with
-                                                                                        | x when x <> null -> Int64.Parse(x.Replace("R", ""))
-                                                                                        | _ -> -1L
-                                                                                     event.Handled <- true
-                                                                                     dispatch (BoxClicked xid))
-                                    ]
-
-                                    yield TextBlock.create [
-                                            TextBlock.name (sprintf "T%i" state.CurrentBox.Id)
-                                            TextBlock.text (sprintf "%s" state.CurrentBox.Name)
-                                            TextBlock.width 80.0
-                                            TextBlock.height 25.0
-                                            TextBlock.left (state.CurrentBox.Point.X + 5.)
-                                            TextBlock.top (state.CurrentBox.Point.Y + 5.)
-                                            TextBlock.onPointerPressed (fun event -> let eventSourceName = (event.Source :?> Control).Name
-                                                                                     printfn "TextBox Event %A, Point %A, Source %A, Name %A" event (event.GetPosition (event.Source :?> IVisual)) event.Source eventSourceName
-                                                                                     let xid =
-                                                                                        match eventSourceName with
-                                                                                        | x when x <> null -> Int64.Parse(x.Replace("T", ""))
-                                                                                        | _ -> -1L
-                                                                                     event.Handled <- true
-                                                                                     dispatch (BoxClicked xid))
-                                    ]
-
-                                for nbox in state.BoxList do
-                                    printfn "Rectangle Query Box: %A" nbox
-                                    
-                                    yield Rectangle.create [
-                                            Rectangle.name (sprintf "R%i" nbox.Id)
-                                            Rectangle.fill "white"
-                                            Rectangle.stroke "black"
-                                            Rectangle.strokeThickness 1.
-                                            Rectangle.width 80.0
-                                            Rectangle.height 25.0
-                                            Rectangle.left nbox.Point.X
-                                            Rectangle.top nbox.Point.Y
-                                            Rectangle.onPointerPressed (fun event -> let eventSourceName = (event.Source :?> Control).Name
-                                                                                     printfn "Rect Event %A, Point %A, Source %A, Name %A" event (event.GetPosition (event.Source :?> IVisual)) event.Source eventSourceName
-                                                                                     let xid =
-                                                                                        match eventSourceName with
-                                                                                        | x when x <> null -> Int64.Parse(x.Replace("R", ""))
-                                                                                        | _ -> -1L
-
-                                                                                     event.Handled <- true
-                                                                                     dispatch (BoxClicked xid))
-                                        ]
-
-                                    yield TextBlock.create [
-                                            TextBlock.name (sprintf "T%i" nbox.Id)
-                                            TextBlock.text (sprintf "%s" nbox.Name)
-                                            TextBlock.width 80.0
-                                            TextBlock.height 25.0
-                                            TextBlock.left (nbox.Point.X + 5.)
-                                            TextBlock.top (nbox.Point.Y + 5.)
-                                            TextBlock.onPointerPressed (fun event -> let eventSourceName = (event.Source :?> Control).Name
-                                                                                     printfn "TextBox Event %A, Point %A, Source %A, Name %A" event (event.GetPosition (event.Source :?> IVisual)) event.Source eventSourceName
-                                                                                     let xid =
-                                                                                        match eventSourceName with
-                                                                                        | x when x <> null -> Int64.Parse(x.Replace("T", ""))
-                                                                                        | _ -> -1L
-                                                                                     event.Handled <- true
-                                                                                     dispatch (BoxClicked xid))
-                                        ]
-                                        
-                                printfn "--------End Drawing Query Boxes---------"   
-                            ]
-                        ]
-                    ]
-                ]
-
-                StackPanel.create [
-                    Grid.column 1
-                    StackPanel.children [
-                        
-                        TextBox.create [ TextBox.text state.CurrentName
-                                         TextBox.onTextChanged (fun text -> printfn "Text %s" text
-                                                                            dispatch (CurrentNameChanged text)) ]
-                    ]
-                ]
+                canvasGrid state dispatch
+                rightPanel state dispatch
             ]
         ]
 
@@ -209,7 +192,14 @@ module Shell =
 
             //this.VisualRoot.VisualRoot.Renderer.DrawFps <- true
             //this.VisualRoot.VisualRoot.Renderer.DrawDirtyRects <- true
-
+            // you can use the following DEBUG helpers to trace elmish updates and to 
+            // open Avalonia DevTools
+#if DEBUG
+            this.AttachDevTools(KeyGesture.Parse("F12"))
+#endif
             Elmish.Program.mkProgram (fun () -> init) update view
             |> Program.withHost this
+#if DEBUG
+            |> Program.withConsoleTrace
+#endif
             |> Program.run
