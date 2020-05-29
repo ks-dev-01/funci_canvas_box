@@ -50,6 +50,10 @@ module Shell =
           Point = point }
 
     let update (msg: Msg) (state: State): State * Cmd<_> =
+        //if FirstClick <> DateTime.Now.ToLongTimeString() then
+        //    FirstClick <- DateTime.Now.ToLongTimeString()
+        printfn ">>>>>>>>>Update Triggered %s<<<<<<<<<<<<<" (DateTime.Now.ToLongTimeString())
+
         match msg with
         | NewBox point ->
             let id =
@@ -72,15 +76,18 @@ module Shell =
                 /// check with pattern matching if we have a current box
                 match state.CurrentBox with 
                 /// if we have a box and the id matches then return the box, else don't return anything
-                | Some bx -> if bx.Id = id then (Some bx, bx.Name) else (None, "")
-                | None -> 
+                | Some bx when bx.Id = id -> printfn "Some bx: %A" bx
+                                             (Some bx, bx.Name) 
+                | _ -> 
                     /// if we don't have anything check if the id exists in the boxes
                     /// then return that box with its name
                     let bx = state.BoxList |> List.find(fun bx -> bx.Id =  id)
+                    printfn "None bx: %A" bx
                     (Some bx, bx.Name)
             /// update the CurrentBpx (BoxComponent option) and the CurrentName
             { state with CurrentBox = clicked; CurrentName = currentName }, Cmd.none
         | CurrentNameChanged text ->
+            printfn "CurrentNameChanged Id: %s" text
             match state.CurrentBox with
             /// again check if we have a box selected
             | Some bx ->
@@ -143,6 +150,10 @@ module Shell =
                     Canvas.background "white"
                     Canvas.onPointerPressed (
                         fun event ->
+                            printfn "-----------------------------"
+                            printfn "-------CLICK: %s----" (DateTime.Now.ToLongTimeString())
+                            printfn "-----------------------------"
+
                             event.Handled <- true                                                                       
                             let source = (event.Source :?> Control)
                             let eventSourceName = source.Name
