@@ -11,7 +11,7 @@ The shell allows two views:
   - The List is of the follow page views / typed
     - PageOther
     - PageSimple
-      - Same as PageOther, but organise Horizontally instead of vertically
+      - Same as PageOther, but arranged horizontally instead of vertically
   - PageCanvas
 
 Previously, the PageSelector code was the Shell code and worked, but when I moved the logic from the Shell, into Page Selector, (nesting a view in a view), it no longer worked.
