@@ -3,7 +3,7 @@ Testing Avalonia FuncUi
 
 Troubleshooting learning with FuncUI
 
-I ran into an issue with created a nested view, in a nested view.
+I ran into an issue when creating a nested view, in a nested view.
 
 The shell allows two views:
     - A PageOther View which is a simple view with a text box, and a text block, in a vertical view
