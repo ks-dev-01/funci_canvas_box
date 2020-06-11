@@ -6,13 +6,13 @@ Troubleshooting learning with FuncUI
 I ran into an issue when creating a nested view, in a nested view.
 
 The shell allows two views:
-    - A PageOther View which is a simple view with a text box, and a text block, in a vertical view
-    - A PageSelector which, on the left hadn side has a ListBox with several items, that when clicked will show a different view on the right hand side
-        - The List is of the follow page views / typed
-            - PageOther
-            - PageSimple
-                - Same as PageOther, but organise Horizontally instead of vertically
-            - PageCanvas
+- A PageOther View which is a simple view with a text box, and a text block, in a vertical view
+- A PageSelector which, on the left hadn side has a ListBox with several items, that when clicked will show a different view on the right hand side
+ - The List is of the follow page views / typed
+  - PageOther
+  - PageSimple
+   - Same as PageOther, but organise Horizontally instead of vertically
+  - PageCanvas
 
 Previously, the PageSelector code was the Shell code and worked, but when I moved the logic from the Shell, into Page Selector, (nesting a view in a view), it no longer worked.
 
