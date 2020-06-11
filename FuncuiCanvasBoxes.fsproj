@@ -4,6 +4,10 @@
     <TargetFramework>netcoreapp3.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="PageCanvas.fs" />
+    <Compile Include="PageSimple.fs" />
+    <Compile Include="PageOther.fs" />
+    <Compile Include="PageSelectorPage.fs" />
     <Compile Include="Shell.fs" />
     <Compile Include="Program.fs" />
     <AvaloniaResource Include="**\*.xaml" />
