@@ -1,7 +1,7 @@
 # funci_canvas_box
 Testing Avalonia FuncUi
 
-**NOTE:** The issue in this reposition has been fixed with a new release of FuncUi.
+**NOTE:** The issue in this repository has been fixed with a new release of FuncUi.
 Troubleshooting learning with FuncUI
 
 I ran into an issue when creating a nested view, in a nested view. 
