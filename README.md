@@ -2,6 +2,7 @@
 Testing Avalonia FuncUi
 
 **NOTE:** The issue in this repository has been fixed with a new release of FuncUi.
+
 Troubleshooting learning with FuncUI
 
 I ran into an issue when creating a nested view, in a nested view. 
